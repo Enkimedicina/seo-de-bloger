@@ -129,6 +129,9 @@ app.post("/api/auth/logout", (req, res) => {
   });
 });
 
+// Export for Vercel
+export default app;
+
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -140,9 +143,19 @@ async function startServer() {
     app.use(express.static("dist"));
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  // Only listen if not running as a serverless function
+  if (process.env.VITE_DEV_SERVER !== 'true' && process.env.NODE_ENV !== 'production') {
+     app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  } else if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
-startServer();
+// In AI Studio, we want to start the server
+if (!process.env.VERCEL) {
+  startServer();
+}
