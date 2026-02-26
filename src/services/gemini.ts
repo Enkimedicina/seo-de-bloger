@@ -1,8 +1,17 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+let aiInstance: GoogleGenAI | null = null;
+
+function getAI() {
+  if (!aiInstance) {
+    const apiKey = process.env.GEMINI_API_KEY || "";
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+}
 
 export async function generateTitles(topic: string) {
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: `Actúa como un Redactor SEO Senior. Tu objetivo es crear un calendario editorial de 20 títulos únicos y optimizados para SEO sobre el tema: "${topic}". 
@@ -26,6 +35,7 @@ export async function generateTitles(topic: string) {
 }
 
 export async function generateOutline(title: string) {
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: `Actúa como un Redactor SEO Senior. Crea un esquema (outline) detallado para un artículo titulado: "${title}".
@@ -58,6 +68,7 @@ export async function generateOutline(title: string) {
 
 export async function generateSectionContent(articleTitle: string, outline: any[], sectionIndex: number, previousContent: string = "") {
   const section = outline[sectionIndex];
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: `Actúa como un Redactor SEO Senior. Estás escribiendo un artículo de 3,000 palabras titulado "${articleTitle}".
