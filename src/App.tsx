@@ -12,15 +12,10 @@ import {
   ArrowLeft,
   PenTool,
   Sparkles,
-  Globe,
-  LogOut,
-  ExternalLink,
-  AlertCircle,
   Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
-import { marked } from 'marked';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { generateTitles, generateOutline, generateSectionContent } from './services/gemini';
@@ -46,100 +41,9 @@ export default function App() {
   const [outline, setOutline] = useState<OutlineItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentSectionIndex, setCurrentSectionIndex] = useState(-1);
-  
-  // Blogger State
-  const [isConnected, setIsConnected] = useState(false);
-  const [blogs, setBlogs] = useState<any[]>([]);
-  const [selectedBlogId, setSelectedBlogId] = useState('');
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [publishedUrl, setPublishedUrl] = useState('');
-  const [autoPublish, setAutoPublish] = useState(true);
   const [copied, setCopied] = useState(false);
-
+  
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    checkAuthStatus();
-    
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        checkAuthStatus();
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
-  const checkAuthStatus = async () => {
-    try {
-      const res = await fetch('/api/auth/status');
-      const data = await res.json();
-      setIsConnected(data.connected);
-      if (data.connected) {
-        fetchBlogs();
-      }
-    } catch (error) {
-      console.error("Error checking auth status:", error);
-    }
-  };
-
-  const fetchBlogs = async () => {
-    try {
-      const res = await fetch('/api/blogger/blogs');
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setBlogs(data);
-        if (data.length > 0) setSelectedBlogId(data[0].id);
-      }
-    } catch (error) {
-      console.error("Error fetching blogs:", error);
-    }
-  };
-
-  const handleConnect = async () => {
-    try {
-      const res = await fetch('/api/auth/url');
-      const { url } = await res.json();
-      window.open(url, 'google_oauth', 'width=600,height=700');
-    } catch (error) {
-      console.error("Error getting auth url:", error);
-    }
-  };
-
-  const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    setIsConnected(false);
-    setBlogs([]);
-  };
-
-  const handlePublish = async (finalOutline?: OutlineItem[]) => {
-    if (!selectedBlogId) return;
-    setIsPublishing(true);
-    try {
-      const targetOutline = finalOutline || outline;
-      const fullMarkdown = `# ${selectedTitle}\n\n` + targetOutline.map(s => s.content).join('\n\n');
-      const htmlContent = await marked.parse(fullMarkdown);
-      
-      const res = await fetch('/api/blogger/publish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          blogId: selectedBlogId,
-          title: selectedTitle,
-          content: htmlContent
-        })
-      });
-      
-      const data = await res.json();
-      if (data.url) {
-        setPublishedUrl(data.url);
-      }
-    } catch (error) {
-      console.error("Error publishing:", error);
-    } finally {
-      setIsPublishing(false);
-    }
-  };
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -178,7 +82,6 @@ export default function App() {
   const startWriting = async () => {
     setStep('writing');
     setCurrentSectionIndex(0);
-    setPublishedUrl('');
     
     let fullContent = "";
     const newOutline = [...outline];
@@ -203,11 +106,6 @@ export default function App() {
     }
     
     setStep('finished');
-
-    // Automatic Publication
-    if (autoPublish && isConnected && selectedBlogId) {
-      handlePublish(newOutline);
-    }
   };
 
   const downloadArticle = () => {
@@ -238,7 +136,6 @@ export default function App() {
     setSelectedTitle('');
     setOutline([]);
     setCurrentSectionIndex(-1);
-    setPublishedUrl('');
   };
 
   return (
@@ -253,33 +150,14 @@ export default function App() {
             <h1 className="font-serif italic text-xl font-bold tracking-tight">SEO Architect</h1>
           </div>
           
-          <div className="flex items-center gap-4">
-            {isConnected ? (
-              <div className="flex items-center gap-3 bg-[#5A5A40]/10 px-3 py-1.5 rounded-full border border-[#5A5A40]/20">
-                <div className="w-2 h-2 rounded-full bg-green-500" />
-                <span className="text-xs font-bold text-[#5A5A40]">Blogger Conectado</span>
-                <button onClick={handleLogout} className="text-[#141414]/40 hover:text-red-500 transition-colors">
-                  <LogOut size={14} />
-                </button>
-              </div>
-            ) : (
-              <button 
-                onClick={handleConnect}
-                className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest bg-[#141414] text-white px-4 py-2 rounded-full hover:bg-[#2a2a2a] transition-all"
-              >
-                <Globe size={14} /> Conectar Blogger
-              </button>
-            )}
-            <div className="h-4 w-px bg-[#141414]/10 mx-2" />
-            <div className="flex items-center gap-4 text-xs font-medium uppercase tracking-widest opacity-50">
-              <span className={cn(step === 'topic' && "text-[#141414] opacity-100")}>01. Tema</span>
-              <ChevronRight size={12} />
-              <span className={cn(step === 'titles' && "text-[#141414] opacity-100")}>02. Títulos</span>
-              <ChevronRight size={12} />
-              <span className={cn(step === 'outline' && "text-[#141414] opacity-100")}>03. Esquema</span>
-              <ChevronRight size={12} />
-              <span className={cn((step === 'writing' || step === 'finished') && "text-[#141414] opacity-100")}>04. Redacción</span>
-            </div>
+          <div className="flex items-center gap-4 text-xs font-medium uppercase tracking-widest opacity-50">
+            <span className={cn(step === 'topic' && "text-[#141414] opacity-100")}>01. Tema</span>
+            <ChevronRight size={12} />
+            <span className={cn(step === 'titles' && "text-[#141414] opacity-100")}>02. Títulos</span>
+            <ChevronRight size={12} />
+            <span className={cn(step === 'outline' && "text-[#141414] opacity-100")}>03. Esquema</span>
+            <ChevronRight size={12} />
+            <span className={cn((step === 'writing' || step === 'finished') && "text-[#141414] opacity-100")}>04. Redacción</span>
           </div>
         </div>
       </header>
@@ -299,7 +177,7 @@ export default function App() {
                   Crea contenido SEO <br /> que realmente posicione.
                 </h2>
                 <p className="text-lg text-[#141414]/60 max-w-lg mx-auto">
-                  Genera calendarios editoriales de 20 artículos y redacciones de 3,000 palabras optimizadas para Blogger.
+                  Genera calendarios editoriales de 20 artículos y redacciones de 3,000 palabras optimizadas.
                 </p>
               </div>
 
@@ -417,49 +295,6 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-
-                <div className="p-8 bg-[#F5F5F0] border-t border-[#141414]/5 space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-bold uppercase tracking-widest opacity-50">Configuración de Publicación</h4>
-                    {!isConnected && (
-                      <button onClick={handleConnect} className="text-xs font-bold text-[#5A5A40] flex items-center gap-1 hover:underline">
-                        <Globe size={12} /> Conectar Blogger para automatizar
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold opacity-70">Seleccionar Blog</label>
-                      <select 
-                        disabled={!isConnected}
-                        value={selectedBlogId}
-                        onChange={(e) => setSelectedBlogId(e.target.value)}
-                        className="w-full bg-white border border-[#141414]/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#141414] disabled:opacity-50"
-                      >
-                        {blogs.length > 0 ? (
-                          blogs.map(blog => <option key={blog.id} value={blog.id}>{blog.name}</option>)
-                        ) : (
-                          <option>No hay blogs disponibles</option>
-                        )}
-                      </select>
-                    </div>
-
-                    <div className="flex items-center gap-3 pt-6">
-                      <input 
-                        type="checkbox" 
-                        id="autoPublish" 
-                        checked={autoPublish}
-                        onChange={(e) => setAutoPublish(e.target.checked)}
-                        className="w-5 h-5 accent-[#5A5A40]"
-                      />
-                      <label htmlFor="autoPublish" className="text-sm font-medium cursor-pointer">
-                        Publicar automáticamente al terminar
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
                 <div className="p-8 bg-[#141414] flex items-center justify-between">
                   <div className="text-white/60 text-sm">
                     <span className="text-white font-bold">Objetivo:</span> ~3,000 palabras reales
@@ -516,42 +351,15 @@ export default function App() {
                     className="bg-[#141414] text-white rounded-2xl p-6 space-y-4"
                   >
                     <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "w-10 h-10 rounded-full flex items-center justify-center",
-                        publishedUrl ? "bg-green-500" : "bg-blue-500"
-                      )}>
-                        {isPublishing ? <Loader2 className="animate-spin" size={24} /> : <CheckCircle2 size={24} />}
+                      <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                        <CheckCircle2 size={24} />
                       </div>
                       <div>
-                        <h4 className="font-bold">{publishedUrl ? "¡Publicado con éxito!" : "¡Artículo Completo!"}</h4>
-                        <p className="text-white/60 text-xs">
-                          {isPublishing ? "Publicando en Blogger..." : 
-                           publishedUrl ? "Ya está en vivo en tu blog." : 
-                           "Listo para descargar o publicar."}
-                        </p>
+                        <h4 className="font-bold">¡Artículo Completo!</h4>
+                        <p className="text-white/60 text-xs">Listo para usar.</p>
                       </div>
                     </div>
-
-                    {publishedUrl ? (
-                      <a 
-                        href={publishedUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="w-full bg-green-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-600 transition-all"
-                      >
-                        <ExternalLink size={18} /> Ver en Blogger
-                      </a>
-                    ) : isConnected && selectedBlogId && (
-                      <button 
-                        onClick={() => handlePublish()}
-                        disabled={isPublishing}
-                        className="w-full bg-[#5A5A40] text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#6a6a50] disabled:opacity-50 transition-all"
-                      >
-                        {isPublishing ? <Loader2 className="animate-spin" size={18} /> : <Globe size={18} />}
-                        Publicar ahora
-                      </button>
-                    )}
-
+                    
                     <div className="pt-2 space-y-2">
                       <button 
                         onClick={handleCopy}
